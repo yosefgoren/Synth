@@ -228,17 +228,32 @@ def generate_sine_permutation_solo(time_step: float, total_time: float, baseline
     indices = [i + p for i, p in zip(baseline, permutation)]
     return indices
 
-TIME_STEP = 0.25
-TOTAL_TIME = 30.0
-BASELINE_PERIODS = int(TOTAL_TIME/10)
-BASELINE_AMPLITUDE = 10
-PERMUTATION_MAX = 4
-indices = generate_sine_permutation_solo(TIME_STEP, TOTAL_TIME, BASELINE_PERIODS, BASELINE_AMPLITUDE, PERMUTATION_MAX)
-indices_sets = [[i+j for i in indices] for j in range(3)]#generate 3 tracks - each one takes a different position of a chord
+def expand_map(ls: list, f)->list:
+    lss = [f(l) for l in ls]
+    res = []
+    for ls in lss:
+        res.extend(ls)
+    return res
 
-tracks = [compose(Scale("C4", PENTATONIC_BLUES_SCALE_PATTERN), indices) for indices in indices_sets]
+TIME_STEP = 0.5
+TOTAL_TIME = 60.0
+SCALE_PATTERN = PENTATONIC_BLUES_SCALE_PATTERN
+BASELINE_PERIODS = int(TOTAL_TIME/10)
+BASELINE_AMPLITUDE = 7
+PERMUTATION_MAX = 3
+REVOICE = 3
+indices_sets = [generate_sine_permutation_solo(TIME_STEP, TOTAL_TIME, BASELINE_PERIODS, BASELINE_AMPLITUDE, PERMUTATION_MAX)]
+indices_sets = expand_map(indices_sets, lambda indices: [[i+j for i in indices] for j in range(2)])#convert each note to to triad
+indices_sets = expand_map(indices_sets, lambda indices: [[i+j*len(SCALE_PATTERN) for i in indices] for j in range(3)])#duplicate each note over 2 octaves
+# indices_sets = expand_map(indices_sets, lambda indices: [indices]*REVOICE)
+
+tracks = [compose(Scale("C3", SCALE_PATTERN), indices) for indices in indices_sets]
 notes_sets = [generate_sequential_notes(track, TIME_STEP) for track in tracks]
-notes_sets = [avg_convolve_buffer(notes, 200) for notes in notes_sets]
+# notes_sets = [np.roll(notes, int(SAMPLE_RATE/TIME_STEP/(REVOICE*2)*i)) for i, notes in enumerate(notes_sets)]
+
 notes = sum(notes_sets)
+notes = avg_convolve_buffer(notes, 100)
+# plt.plot(notes[:int(SAMPLE_RATE/TIME_STEP*5)])
+# plt.show()
 audio = convert_to_audio(notes)
 play_audio(audio)
